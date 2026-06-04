@@ -189,7 +189,7 @@ discord_client.on('ready', (client) => {
             const command = args.shift()!;
 
             if (
-                ['add-bridge-channel', 'rm-bridge-channel'].includes(command) &&
+                ['add-bridge-channel', 'rm-bridge-channel', 'add-server-adm', 'rm-server-adm'].includes(command) &&
                 !config_manager.getServerAdministrators(msg.guildId).includes(msg.author.id) &&
                 !config_manager.isBotAdministrator(msg.author.id)
             )
@@ -199,7 +199,42 @@ discord_client.on('ready', (client) => {
             if (!ch_mention && ['add-bridge-channel', 'rm-bridge-channel'].includes(command))
                 return await msg.reply('kanał musisz podać btw');
 
+            const u_mention = msg.mentions.channels.first();
+            if (!u_mention && ['add-server-adm', 'rm-server-adm'].includes(command))
+                return await msg.reply('osobe musisz podać btw');
+
             switch (command) {
+                case 'help': {
+                    return await msg.reply([
+                        'siema!',
+                        'disbridge bridguje kanały discorda pomiędzy serwerami tworząc coś w stylu global chat dla wszystkich serwerów w obrębie danej instancji!',
+                        '',
+                        'dostępne komendy:',
+                        '- `eval` (dev-only): wykonuje kod JS',
+                        '- `add-server-adm` oraz `rm-server-adm` (dev-only & existing server admins): kolejno dodaje lub usuwa kogoś z bycia adminem serwera',
+                        '- `add-bridge-channel` i `rm-bridge-channel` (dev-only & existing server admins): te komendy z kolei dodają i usuwają bridge channels',
+                        '- `help`: to co widzisz teraz'
+                    ].join('\n'));
+                }
+
+                case 'add-server-adm': {
+                    if (config_manager.getServerAdministrators(msg.guildId).includes(u_mention!.id)) 
+                        return await msg.reply('ta osoba jest juz adminem serwera');
+
+                    config_manager.addServerAdministrator(msg.guildId, msg.author.id);
+
+                    break;
+                }
+
+                case 'rm-server-adm': {
+                    if (!config_manager.getServerAdministrators(msg.guildId).includes(u_mention!.id)) 
+                        return await msg.reply('ta osoba nie jest adminem serwera');
+
+                    config_manager.removeServerAdministrator(msg.guildId, msg.author.id);
+
+                    break;
+                }
+                
                 case 'add-bridge-channel': {
                     if (config_manager.getBridgedChannels(msg.guildId).includes(ch_mention!.id))
                         return await msg.reply('brother taki bridge channel juz istnieje');
