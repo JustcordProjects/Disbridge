@@ -1,2 +1,5 @@
 bot
 deno.lock
+Dockerfile
+Containerfile
+.dockerignore
