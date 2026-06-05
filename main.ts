@@ -161,26 +161,34 @@ class ConfigurationManager {
     }
 }
 
-const config_manager = new ConfigurationManager();
-const discord_client = new dsc.Client({
-    intents: [
-        dsc.GatewayIntentBits.Guilds, dsc.GatewayIntentBits.GuildMembers,
-        dsc.GatewayIntentBits.GuildMessages, dsc.GatewayIntentBits.MessageContent,
-        dsc.GatewayIntentBits.GuildMembers
-    ],
-    partials: [
-        dsc.Partials.Message, dsc.Partials.GuildMember, dsc.Partials.User
-    ]
-});
+class DisbridgeBot extends ConfigurationManager {
+    private discord_client: dsc.Client;
 
-discord_client.on('ready', (client) => {
-    console.log(`user ready as ${client.user.tag}`);
+    constructor() {
+        super();
 
-    client.on('messageCreate', async (msg) => {
+        this.discord_client = new dsc.Client({
+            intents: [
+                dsc.GatewayIntentBits.Guilds, dsc.GatewayIntentBits.GuildMembers,
+                dsc.GatewayIntentBits.GuildMessages, dsc.GatewayIntentBits.MessageContent,
+                dsc.GatewayIntentBits.GuildMembers
+            ],
+            partials: [
+                dsc.Partials.Message, dsc.Partials.GuildMember, dsc.Partials.User
+            ]
+        });
+        this.initializeDiscordHandlers();
+    }
+
+    public login() {
+        this.discord_client.login(fs.readFileSync('bot/.token', 'utf8').trim());
+    }
+
+    private async discordMessageHandler(msg: dsc.Message) {
         if (msg.partial) return; // this should not happen since we set message partial 
         if (msg.author.bot || !msg.inGuild()) return;
         
-        const bridged_channels = config_manager.getBridgedChannels(msg.guildId);
+        const bridged_channels = this.getBridgedChannels(msg.guildId);
         if (msg.content?.startsWith('dbr!') && bridged_channels.includes(msg.channelId))
             return await msg.reply('nie możesz używać komend bota na bridge channel');
 
@@ -190,8 +198,8 @@ discord_client.on('ready', (client) => {
 
             if (
                 ['add-bridge-channel', 'rm-bridge-channel', 'add-server-adm', 'rm-server-adm'].includes(command) &&
-                !config_manager.getServerAdministrators(msg.guildId).includes(msg.author.id) &&
-                !config_manager.isBotAdministrator(msg.author.id)
+                !this.getServerAdministrators(msg.guildId).includes(msg.author.id) &&
+                !this.isBotAdministrator(msg.author.id)
             )
                 return await msg.reply('tylko admini to mogą');
 
@@ -218,37 +226,37 @@ discord_client.on('ready', (client) => {
                 }
 
                 case 'add-server-adm': {
-                    if (config_manager.getServerAdministrators(msg.guildId).includes(u_mention!.id)) 
+                    if (this.getServerAdministrators(msg.guildId).includes(u_mention!.id)) 
                         return await msg.reply('ta osoba jest juz adminem serwera');
 
-                    config_manager.addServerAdministrator(msg.guildId, msg.author.id);
+                    this.addServerAdministrator(msg.guildId, msg.author.id);
 
                     break;
                 }
 
                 case 'rm-server-adm': {
-                    if (!config_manager.getServerAdministrators(msg.guildId).includes(u_mention!.id)) 
+                    if (!this.getServerAdministrators(msg.guildId).includes(u_mention!.id)) 
                         return await msg.reply('ta osoba nie jest adminem serwera');
 
-                    config_manager.removeServerAdministrator(msg.guildId, msg.author.id);
+                    this.removeServerAdministrator(msg.guildId, msg.author.id);
 
                     break;
                 }
                 
                 case 'add-bridge-channel': {
-                    if (config_manager.getBridgedChannels(msg.guildId).includes(ch_mention!.id))
+                    if (this.getBridgedChannels(msg.guildId).includes(ch_mention!.id))
                         return await msg.reply('brother taki bridge channel juz istnieje');
                     
-                    config_manager.addBridgedChannel(msg.guildId, ch_mention!.id)
+                    this.addBridgedChannel(msg.guildId, ch_mention!.id)
 
                     break;
                 }
 
                 case 'rm-bridge-channel': {
-                    if (!config_manager.getBridgedChannels(msg.guildId).includes(ch_mention!.id))
+                    if (!this.getBridgedChannels(msg.guildId).includes(ch_mention!.id))
                         return await msg.reply('brother taki bridge channel nie istnieje');
                     
-                    config_manager.removeBridgedChannel(msg.guildId, ch_mention!.id)
+                    this.removeBridgedChannel(msg.guildId, ch_mention!.id)
 
                     break;
                 }
@@ -256,7 +264,7 @@ discord_client.on('ready', (client) => {
                 case 'eval': {
                     const what = args.join(' ');
 
-                    if (config_manager.isBotAdministrator(msg.author.id)) {
+                    if (this.isBotAdministrator(msg.author.id)) {
                         return await msg.reply(
                             JSON.stringify({
                                 result: eval(what),
@@ -277,17 +285,17 @@ discord_client.on('ready', (client) => {
             if (!bridged_channels.includes(msg.channelId)) return;
             if (!msg.content && !msg.attachments) return;
 
-            const cfg = config_manager.getConfiguration();
+            const cfg = this.getConfiguration();
             for (const server_cfg of cfg.servers) {
                 if (server_cfg.serverId == msg.guildId) continue;
 
                 try {
-                    const server = await client.guilds.fetch(server_cfg.serverId);
+                    const server = await this.discord_client.guilds.fetch(server_cfg.serverId);
                     const webhooks = await server.fetchWebhooks();
 
                     for (const channel_id of server_cfg.bridgedChannels) {
                         try {
-                            let webhook = webhooks.find((w) => w.channelId == channel_id && w.owner?.id == client.user.id);
+                            let webhook = webhooks.find((w) => w.channelId == channel_id && w.owner?.id == this.discord_client.user?.id);
                             if (!webhook) {
                                 const channel = await server.channels.fetch(channel_id);
                                 if (!channel?.isTextBased() || channel.isThread() || channel.isDMBased()) throw 'could not create webhook';
@@ -323,7 +331,14 @@ discord_client.on('ready', (client) => {
                 // ...
             }
         }
-    })
-})
+    }
 
-discord_client.login(fs.readFileSync('bot/.token', 'utf8').trim());
+    private initializeDiscordHandlers() {
+        this.discord_client
+            .on('messageCreate', this.discordMessageHandler)
+            .on('clientReady', (client) => console.log(client.user.id))
+    }
+}
+
+const disbridge = new DisbridgeBot();
+disbridge.login();
