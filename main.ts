@@ -336,7 +336,7 @@ class DisbridgeBot extends ConfigurationManager {
 
     private initializeDiscordHandlers() {
         this.discord_client
-            .on('messageCreate', this.discordMessageHandler)
+            .on('messageCreate', this.discordMessageHandler.bind(this))
             .on('clientReady', (client) => console.log(client.user.id))
             .on('clientReady', (client) => {
                 process.on('uncaughtException', async (e) => {
