@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as dsc from 'discord.js';
 import process from "node:process";
 
+
 interface BotServerConfiguration {
     bridgedChannels: string[];
     administrators: string[];
@@ -337,6 +338,17 @@ class DisbridgeBot extends ConfigurationManager {
         this.discord_client
             .on('messageCreate', this.discordMessageHandler)
             .on('clientReady', (client) => console.log(client.user.id))
+            .on('clientReady', (client) => {
+                process.on('uncaughtException', async (e) => {
+                    try {
+                        console.error(e);
+                        const operator = await client.users.fetch(this.getConfiguration().botAdmins[0]);
+                        (await operator.createDM()).send(e.stack ?? e.message);
+                    } catch {
+                        // ...
+                    }
+                })
+            })
     }
 }
 
