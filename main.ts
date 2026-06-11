@@ -185,7 +185,7 @@ class DisbridgeBot extends ConfigurationManager {
         this.discord_client.login(fs.readFileSync('bot/.token', 'utf8').trim());
     }
 
-    private async discordMessageHandler(msg: dsc.Message) {
+    private discordMessageHandler = async (msg: dsc.Message) => {
         if (msg.partial) return; // this should not happen since we set message partial 
         if (msg.author.bot || !msg.inGuild()) return;
         
@@ -230,7 +230,7 @@ class DisbridgeBot extends ConfigurationManager {
                     if (this.getServerAdministrators(msg.guildId).includes(u_mention!.id)) 
                         return await msg.reply('ta osoba jest juz adminem serwera');
 
-                    this.addServerAdministrator(msg.guildId, msg.author.id);
+                    this.addServerAdministrator(msg.guildId, u_mention!.id);
 
                     break;
                 }
@@ -239,7 +239,7 @@ class DisbridgeBot extends ConfigurationManager {
                     if (!this.getServerAdministrators(msg.guildId).includes(u_mention!.id)) 
                         return await msg.reply('ta osoba nie jest adminem serwera');
 
-                    this.removeServerAdministrator(msg.guildId, msg.author.id);
+                    this.removeServerAdministrator(msg.guildId, u_mention!.id);
 
                     break;
                 }
@@ -336,7 +336,7 @@ class DisbridgeBot extends ConfigurationManager {
 
     private initializeDiscordHandlers() {
         this.discord_client
-            .on('messageCreate', this.discordMessageHandler.bind(this))
+            .on('messageCreate', this.discordMessageHandler)
             .on('clientReady', (client) => console.log(client.user.id))
             .on('clientReady', (client) => {
                 process.on('uncaughtException', async (e) => {
